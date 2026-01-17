@@ -1,0 +1,222 @@
+
+import React, { useState, useMemo } from 'react';
+import { Order, ShipmentStatus } from '../types';
+
+interface OrderTableProps {
+  orders: Order[];
+  title: string;
+  statusFilter?: ShipmentStatus;
+  onUpdateStatus?: (id: string, status: ShipmentStatus) => void;
+}
+
+const OrderTable: React.FC<OrderTableProps> = ({ 
+  orders, 
+  title, 
+  statusFilter, 
+  onUpdateStatus
+}) => {
+  const [searchTerm, setSearchTerm] = useState('');
+  const [locationSearch, setLocationSearch] = useState('');
+  const [delayedFilter, setDelayedFilter] = useState<'none' | 'update' | 'collection' | 'return'>('none');
+
+  const filteredOrders = useMemo(() => {
+    let result = orders;
+    
+    if (statusFilter) {
+      result = result.filter(o => o.status === statusFilter);
+    }
+
+    const now = new Date();
+    if (delayedFilter === 'update') {
+      result = result.filter(o => {
+        const exitDateStr = o.exitDate || o.createdAt;
+        const diff = (now.getTime() - new Date(exitDateStr).getTime()) / (1000 * 3600 * 24);
+        return o.status === ShipmentStatus.DAILY_OUT && diff > 4;
+      });
+    } else if (delayedFilter === 'collection') {
+      result = result.filter(o => {
+        const diff = (now.getTime() - new Date(o.updatedAt).getTime()) / (1000 * 3600 * 24);
+        return o.status === ShipmentStatus.DELIVERED && diff > 7;
+      });
+    } else if (delayedFilter === 'return') {
+      result = result.filter(o => {
+        const diff = (now.getTime() - new Date(o.updatedAt).getTime()) / (1000 * 3600 * 24);
+        return o.status === ShipmentStatus.FAILED && diff > 7;
+      });
+    }
+
+    if (searchTerm) {
+      const s = searchTerm.toLowerCase();
+      result = result.filter(o => 
+        o.orderNumber.toLowerCase().includes(s) || 
+        o.customerName.toLowerCase().includes(s) || 
+        o.phone.includes(s) ||
+        (o.phone2 && o.phone2.includes(s))
+      );
+    }
+
+    if (locationSearch) {
+      const l = locationSearch.toLowerCase();
+      result = result.filter(o => 
+        o.province.toLowerCase().includes(l) || 
+        o.city.toLowerCase().includes(l)
+      );
+    }
+
+    return result;
+  }, [orders, statusFilter, searchTerm, locationSearch, delayedFilter]);
+
+  return (
+    <div className="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
+      <div className="p-6 border-b border-slate-50 space-y-4">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <h3 className="text-xl font-bold text-slate-800">{title} <span className="text-sm font-normal text-slate-400 bg-slate-100 px-2 py-1 rounded-lg">العدد: {filteredOrders.length}</span></h3>
+          <div className="flex flex-wrap gap-2">
+            <input 
+              type="text" 
+              placeholder="رقم الاوردر، الاسم، الهاتف..." 
+              className="px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none w-64"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+            <input 
+              type="text" 
+              placeholder="المحافظة أو المدينة..." 
+              className="px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none w-48"
+              value={locationSearch}
+              onChange={(e) => setLocationSearch(e.target.value)}
+            />
+          </div>
+        </div>
+
+        {(!statusFilter || statusFilter === ShipmentStatus.DAILY_OUT) && (
+          <div className="flex gap-2 flex-wrap border-t border-slate-50 pt-4">
+            <button 
+              onClick={() => setDelayedFilter(delayedFilter === 'update' ? 'none' : 'update')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1 ${delayedFilter === 'update' ? 'bg-orange-600 text-white shadow-lg shadow-orange-200' : 'bg-orange-50 text-orange-600 border border-orange-100'}`}
+            >
+              <span className="material-icons text-sm">timer</span> متأخرة في التحديث
+            </button>
+            <button 
+              onClick={() => setDelayedFilter(delayedFilter === 'collection' ? 'none' : 'collection')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1 ${delayedFilter === 'collection' ? 'bg-yellow-600 text-white shadow-lg shadow-yellow-200' : 'bg-yellow-50 text-yellow-600 border border-yellow-100'}`}
+            >
+              <span className="material-icons text-sm">payments</span> متأخرة في التحصيل
+            </button>
+            <button 
+              onClick={() => setDelayedFilter(delayedFilter === 'return' ? 'none' : 'return')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1 ${delayedFilter === 'return' ? 'bg-purple-600 text-white shadow-lg shadow-purple-200' : 'bg-purple-50 text-purple-600 border border-purple-100'}`}
+            >
+              <span className="material-icons text-sm">history</span> متأخرة في المرتجع
+            </button>
+          </div>
+        )}
+      </div>
+
+      <div className="overflow-x-auto">
+        <table className="w-full text-right whitespace-nowrap">
+          <thead className="bg-slate-50 text-slate-500 text-[11px] font-bold uppercase">
+            <tr>
+              <th className="px-4 py-3 border-l">رقم الاوردر</th>
+              <th className="px-4 py-3 border-l">تاريخ الخروج</th>
+              <th className="px-4 py-3 border-l">اسم المستلم</th>
+              <th className="px-4 py-3 border-l">الهاتف 1</th>
+              <th className="px-4 py-3 border-l">الهاتف 2</th>
+              <th className="px-4 py-3 border-l">المدينة</th>
+              <th className="px-4 py-3 border-l">المنطقة</th>
+              <th className="px-4 py-3 border-l">العنوان</th>
+              <th className="px-4 py-3 border-l">عدد القطع</th>
+              <th className="px-4 py-3 border-l">المنتجات</th>
+              <th className="px-4 py-3 border-l">سعر بدون شحن</th>
+              <th className="px-4 py-3 border-l">سعر الشحن</th>
+              <th className="px-4 py-3 border-l">سعر بالشحن</th>
+              <th className="px-4 py-3 border-l">المطلوب تحصيله</th>
+              <th className="px-4 py-3 border-l">شركة الشحن</th>
+              <th className="px-4 py-3 border-l">موظف التأكيد</th>
+              <th className="px-4 py-3 border-l">الحالة</th>
+              
+              {statusFilter === ShipmentStatus.DELIVERED && <th className="px-4 py-3 border-l bg-green-50">تاريخ التسليم</th>}
+              {statusFilter === ShipmentStatus.FAILED && <th className="px-4 py-3 border-l bg-red-50">تاريخ الفشل</th>}
+              {statusFilter === ShipmentStatus.RETURNED && <th className="px-4 py-3 border-l bg-slate-100">تاريخ المرتجع</th>}
+              {statusFilter === ShipmentStatus.COLLECTED && (
+                <>
+                  <th className="px-4 py-3 border-l bg-teal-50">تاريخ التحصيل</th>
+                  <th className="px-4 py-3 border-l bg-teal-50">م.الشحن</th>
+                  <th className="px-4 py-3 border-l bg-teal-50">شحن النظام</th>
+                  <th className="px-4 py-3 border-l bg-teal-50">الفرق</th>
+                  <th className="px-4 py-3 border-l bg-teal-50">الصافي</th>
+                  <th className="px-4 py-3 border-l bg-teal-50">م.المرتجع</th>
+                </>
+              )}
+              <th className="px-4 py-3">الإجراءات</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100 text-[12px]">
+            {filteredOrders.length === 0 ? (
+              <tr><td colSpan={30} className="px-6 py-12 text-center text-slate-400 italic">لا توجد بيانات</td></tr>
+            ) : filteredOrders.map((order) => (
+              <tr key={order.id} className="hover:bg-slate-50 transition-colors">
+                <td className="px-4 py-3 font-mono font-bold">{order.orderNumber}</td>
+                <td className="px-4 py-3">{order.exitDate}</td>
+                <td className="px-4 py-3 font-bold">{order.customerName}</td>
+                <td className="px-4 py-3">{order.phone}</td>
+                <td className="px-4 py-3 text-slate-400">{order.phone2}</td>
+                <td className="px-4 py-3 font-bold text-slate-600">{order.province}</td>
+                <td className="px-4 py-3">{order.city}</td>
+                <td className="px-4 py-3 max-w-[150px] truncate">{order.address}</td>
+                <td className="px-4 py-3 text-center">{order.pieces}</td>
+                <td className="px-4 py-3 max-w-[150px] truncate">{order.products}</td>
+                <td className="px-4 py-3 text-slate-500">{order.amountWithoutShipping}</td>
+                <td className="px-4 py-3 text-slate-500">{order.shippingFee}</td>
+                <td className="px-4 py-3 text-slate-500">{order.totalWithShipping}</td>
+                <td className="px-4 py-3 font-black text-blue-700">{order.amount}</td>
+                <td className="px-4 py-3">{order.carrierName}</td>
+                <td className="px-4 py-3 text-slate-400">{order.confirmedBy}</td>
+                <td className="px-4 py-3">
+                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                    order.status === ShipmentStatus.DELIVERED ? 'bg-green-100 text-green-700' :
+                    order.status === ShipmentStatus.FAILED ? 'bg-red-100 text-red-700' :
+                    order.status === ShipmentStatus.COLLECTED ? 'bg-teal-100 text-teal-700' :
+                    'bg-blue-100 text-blue-700'
+                  }`}>
+                    {order.status}
+                  </span>
+                </td>
+
+                {statusFilter === ShipmentStatus.DELIVERED && <td className="px-4 py-3 bg-green-50">{order.deliveryDate}</td>}
+                {statusFilter === ShipmentStatus.FAILED && <td className="px-4 py-3 bg-red-50">{order.failedDate}</td>}
+                {statusFilter === ShipmentStatus.RETURNED && <td className="px-4 py-3 bg-slate-50">{order.returnedDate}</td>}
+                {statusFilter === ShipmentStatus.COLLECTED && (
+                  <>
+                    <td className="px-4 py-3 bg-teal-50">{order.collectionDate}</td>
+                    <td className="px-4 py-3 bg-teal-50 font-bold">{order.carrierShippingFee || 0}</td>
+                    <td className="px-4 py-3 bg-teal-50 text-slate-500">{order.systemShippingFee || 0}</td>
+                    <td className={`px-4 py-3 bg-teal-50 font-black ${(order.discrepancy || 0) !== 0 ? 'text-red-600' : 'text-green-600'}`}>
+                      {order.discrepancy || 0}
+                    </td>
+                    <td className="px-4 py-3 bg-teal-50 font-black text-teal-700">{order.netAmount || 0}</td>
+                    <td className="px-4 py-3 bg-teal-50 text-slate-400">{order.returnFee || 0}</td>
+                  </>
+                )}
+
+                <td className="px-4 py-3">
+                  {onUpdateStatus && (
+                    <select 
+                      onChange={(e) => onUpdateStatus(order.id, e.target.value as ShipmentStatus)}
+                      className="bg-white border border-slate-200 rounded-lg text-[10px] px-1 py-1 outline-none focus:ring-1 focus:ring-blue-400 shadow-sm"
+                    >
+                      <option disabled selected>تحديث</option>
+                      {Object.values(ShipmentStatus).map(s => <option key={s} value={s}>{s}</option>)}
+                    </select>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+};
+
+export default OrderTable;
