@@ -1,0 +1,117 @@
+
+import React, { useState } from 'react';
+import { useApp } from '../store';
+import { ShipmentStatus } from '../types';
+
+declare var XLSX: any;
+
+const UploadManager: React.FC = () => {
+  const { bulkUpload } = useApp();
+  const [selectedStatus, setSelectedStatus] = useState<ShipmentStatus>(ShipmentStatus.DAILY_OUT);
+  const [isUploading, setIsUploading] = useState(false);
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsUploading(true);
+    const reader = new FileReader();
+    reader.onload = (evt: any) => {
+      try {
+        const bstr = evt.target.result;
+        const wb = XLSX.read(bstr, { type: 'binary' });
+        const wsname = wb.SheetNames[0];
+        const ws = wb.Sheets[wsname];
+        const data = XLSX.utils.sheet_to_json(ws);
+        
+        bulkUpload(selectedStatus, data);
+        alert(`تم تحديث ${data.length} شحنة بنجاح`);
+      } catch (error) {
+        console.error(error);
+        alert("حدث خطأ أثناء قراءة الملف");
+      } finally {
+        setIsUploading(false);
+      }
+    };
+    reader.readAsBinaryString(file);
+  };
+
+  const templates = {
+    [ShipmentStatus.DAILY_OUT]: ["تاريخ الخروج", "رقم الاوردر", "اسم المستلم", "الهاتف 1", "الهاتف 2", "المدينة", "المنطقة", "العنوان", "عدد القطع", "المنتجات", "السعر الكلي بدون الشحن", "سعر الشحن", "السعر الكلي بالشحن", "المطلوب تحصيله", "شركة الشحن", "موظف التأكيد", "الحالة"],
+    [ShipmentStatus.DELIVERED]: ["رقم الاوردر", "تاريخ التسليم"],
+    [ShipmentStatus.FAILED]: ["رقم الاوردر", "تاريخ فشل التسليم"],
+    [ShipmentStatus.RETURNED]: ["رقم الاوردر", "تاريخ المرتجع", "عدد القطع"],
+    [ShipmentStatus.COLLECTED]: ["تاريخ التحصيل", "رقم الاوردر", "الحالة", "المبلغ الكلي", "م.الشحن", "الصافي", "م.المرتجع"],
+  };
+
+  const downloadTemplate = () => {
+    const headers = templates[selectedStatus] || [];
+    const ws = XLSX.utils.aoa_to_sheet([headers]);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Template");
+    XLSX.writeFile(wb, `Template_${selectedStatus}.xlsx`);
+  };
+
+  return (
+    <div className="p-8 max-w-4xl mx-auto">
+      <div className="bg-white rounded-3xl shadow-xl p-8 border border-slate-100">
+        <div className="text-center mb-10">
+          <div className="w-20 h-20 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-4">
+            <span className="material-icons text-4xl text-blue-600">upload_file</span>
+          </div>
+          <h2 className="text-2xl font-bold text-slate-800">تحديث الشحنات بالجملة</h2>
+          <p className="text-slate-500 mt-2">اختر حالة الشحنة وارفع ملف الإكسيل المقابل</p>
+        </div>
+
+        <div className="space-y-8">
+          <div>
+            <label className="block text-sm font-bold text-slate-700 mb-3">1. اختر الحالة المستهدفة</label>
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+              {Object.values(ShipmentStatus).map(s => (
+                <button
+                  key={s}
+                  onClick={() => setSelectedStatus(s)}
+                  className={`px-4 py-3 rounded-2xl text-xs font-bold transition-all ${
+                    selectedStatus === s 
+                    ? 'bg-blue-600 text-white shadow-lg shadow-blue-200' 
+                    : 'bg-slate-50 text-slate-500 hover:bg-slate-100'
+                  }`}
+                >
+                  {s}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="bg-slate-50 rounded-3xl p-6 border-2 border-dashed border-slate-200 text-center flex flex-col items-center justify-center">
+              <span className="material-icons text-slate-400 mb-2">description</span>
+              <p className="text-xs text-slate-500 mb-4 font-semibold">تأكد من استخدام التنسيق الصحيح للملف</p>
+              <button 
+                onClick={downloadTemplate}
+                className="text-blue-600 text-sm font-bold flex items-center space-x-1 space-x-reverse hover:underline"
+              >
+                <span className="material-icons text-base">download</span>
+                <span>تحميل قالب {selectedStatus}</span>
+              </button>
+            </div>
+
+            <div className="bg-blue-50 rounded-3xl p-6 border-2 border-dashed border-blue-200 text-center flex flex-col items-center justify-center relative">
+              <input 
+                type="file" 
+                accept=".xlsx, .xls" 
+                onChange={handleFileUpload}
+                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+              />
+              <span className="material-icons text-blue-400 mb-2">file_upload</span>
+              <p className="text-sm text-blue-800 font-bold">{isUploading ? 'جاري الرفع...' : 'اسحب الملف هنا أو اضغط للاختيار'}</p>
+              <p className="text-xs text-blue-500 mt-1">يدعم ملفات Excel فقط</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default UploadManager;
