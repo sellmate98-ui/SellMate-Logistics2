@@ -1,0 +1,59 @@
+
+import React from 'react';
+
+interface SidebarProps {
+  currentSection: string;
+  onNavigate: (section: string) => void;
+}
+
+const Sidebar: React.FC<SidebarProps> = ({ currentSection, onNavigate }) => {
+  const menuItems = [
+    { id: 'dashboard', icon: 'dashboard', label: 'لوحة التحكم' },
+    { id: 'daily-out', icon: 'local_shipping', label: 'الخروج اليومي' },
+    { id: 'delivered', icon: 'done_all', label: 'التسليمات' },
+    { id: 'failed', icon: 'error_outline', label: 'فشل التسليم' },
+    { id: 'returned', icon: 'assignment_return', label: 'المرتجعات' },
+    { id: 'collected', icon: 'payments', label: 'التحصيلات' },
+    { id: 'upload', icon: 'cloud_upload', label: 'تحديث الشحنات' },
+    { id: 'shipping-rates', icon: 'settings', label: 'أسعار الشحن' },
+    { id: 'comparison', icon: 'compare_arrows', label: 'المقارنة' },
+    { id: 'search', icon: 'search', label: 'بحث سريع' },
+    { id: 'duplicates', icon: 'content_copy', label: 'التكرارات' },
+  ];
+
+  return (
+    <div className="w-64 bg-slate-900 text-white min-h-screen flex flex-col fixed right-0 top-0 shadow-2xl z-50 transition-all duration-300">
+      <div className="p-6 flex flex-col items-center border-b border-slate-800">
+        <div className="w-16 h-16 bg-blue-500 rounded-2xl flex items-center justify-center mb-3 shadow-lg shadow-blue-500/30">
+          <span className="material-icons text-4xl">inventory_2</span>
+        </div>
+        <h1 className="text-2xl font-bold tracking-tight text-blue-400">SellMate</h1>
+      </div>
+      
+      <nav className="flex-1 mt-4 overflow-y-auto px-4">
+        {menuItems.map((item) => (
+          <button
+            key={item.id}
+            onClick={() => onNavigate(item.id)}
+            className={`w-full flex items-center space-x-3 space-x-reverse px-4 py-3 my-1 rounded-xl transition-all duration-200 group ${
+              currentSection === item.id 
+              ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' 
+              : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+            }`}
+          >
+            <span className={`material-icons transition-transform group-hover:scale-110 ${currentSection === item.id ? 'text-white' : 'text-slate-500'}`}>
+              {item.icon}
+            </span>
+            <span className="font-semibold text-sm">{item.label}</span>
+          </button>
+        ))}
+      </nav>
+
+      <div className="p-4 border-t border-slate-800 text-center">
+        <p className="text-xs text-slate-500">SellMate v2.1 &copy; 2024</p>
+      </div>
+    </div>
+  );
+};
+
+export default Sidebar;
