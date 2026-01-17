@@ -1,0 +1,201 @@
+
+
+import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
+import { Order, ShipmentStatus, ShippingRate, DashboardStats } from './types';
+
+interface AppContextType {
+  orders: Order[];
+  shippingRates: ShippingRate[];
+  addOrder: (order: Partial<Order>) => void;
+  updateOrderStatus: (id: string, status: ShipmentStatus, additionalData?: Partial<Order>) => void;
+  bulkUpload: (status: ShipmentStatus, data: any[]) => void;
+  addRate: (rate: Omit<ShippingRate, 'id'>) => void;
+  deleteRate: (id: string) => void;
+  getStats: () => DashboardStats;
+}
+
+const AppContext = createContext<AppContextType | undefined>(undefined);
+
+const STORAGE_KEYS = {
+  ORDERS: 'sellmate_v2_orders',
+  RATES: 'sellmate_v2_rates'
+};
+
+export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [shippingRates, setShippingRates] = useState<ShippingRate[]>([]);
+
+  // تحميل البيانات من LocalStorage عند بدء التشغيل
+  useEffect(() => {
+    const savedOrders = localStorage.getItem(STORAGE_KEYS.ORDERS);
+    const savedRates = localStorage.getItem(STORAGE_KEYS.RATES);
+    
+    if (savedOrders) {
+      try {
+        setOrders(JSON.parse(savedOrders));
+      } catch (e) {
+        console.error("خطأ في قراءة الطلبات المخزنة:", e);
+      }
+    }
+    
+    if (savedRates) {
+      try {
+        setShippingRates(JSON.parse(savedRates));
+      } catch (e) {
+        console.error("خطأ في قراءة أسعار الشحن المخزنة:", e);
+      }
+    }
+
+    // إخفاء اللودر فور الجاهزية
+    if (typeof window !== 'undefined' && (window as any).hideLoader) {
+      (window as any).hideLoader();
+    }
+  }, []);
+
+  // حفظ البيانات في LocalStorage عند كل تغيير
+  useEffect(() => {
+    if (orders.length > 0) {
+      localStorage.setItem(STORAGE_KEYS.ORDERS, JSON.stringify(orders));
+    }
+  }, [orders]);
+
+  useEffect(() => {
+    if (shippingRates.length > 0) {
+      localStorage.setItem(STORAGE_KEYS.RATES, JSON.stringify(shippingRates));
+    }
+  }, [shippingRates]);
+
+  const addOrder = (data: Partial<Order>) => {
+    const newOrder: Order = {
+      id: data.id || `ORD-${Math.floor(Math.random() * 90000) + 10000}`,
+      orderNumber: String(data.orderNumber || `SN-${Date.now()}`).trim(),
+      exitDate: data.exitDate || new Date().toISOString().split('T')[0],
+      customerName: data.customerName || '',
+      phone: String(data.phone || ''),
+      phone2: String(data.phone2 || ''),
+      province: data.province || '',
+      city: data.city || '',
+      address: data.address || '',
+      pieces: Number(data.pieces) || 1,
+      products: data.products || '',
+      amountWithoutShipping: Number(data.amountWithoutShipping) || 0,
+      shippingFee: Number(data.shippingFee) || 0,
+      totalWithShipping: Number(data.totalWithShipping) || 0,
+      amount: Number(data.amount) || 0,
+      carrierName: data.carrierName || '',
+      confirmedBy: data.confirmedBy || '',
+      status: data.status || ShipmentStatus.DAILY_OUT,
+      createdAt: data.createdAt || new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    
+    setOrders(prev => [newOrder, ...prev]);
+  };
+
+  const updateOrderStatus = (id: string, status: ShipmentStatus, additionalData?: Partial<Order>) => {
+    setOrders(prev => prev.map(order => {
+      if (order.id === id || order.orderNumber === id) {
+        return { ...order, status, updatedAt: new Date().toISOString(), ...additionalData };
+      }
+      return order;
+    }));
+  };
+
+  const addRate = (rate: Omit<ShippingRate, 'id'>) => {
+    const newRate = { ...rate, id: `RATE-${Date.now()}` };
+    setShippingRates(prev => [...prev, newRate]);
+  };
+
+  const deleteRate = (id: string) => {
+    setShippingRates(prev => prev.filter(r => r.id !== id));
+  };
+
+  const bulkUpload = (status: ShipmentStatus, data: any[]) => {
+    if (status === ShipmentStatus.DAILY_OUT) {
+      const newOrders: Order[] = data.map(item => ({
+        id: `ORD-${Math.floor(Math.random() * 90000) + 10000}`,
+        orderNumber: String(item['رقم الاوردر'] || item['orderNumber'] || `SN-${Math.random()}`).trim(),
+        exitDate: item['تاريخ الخروج'] || new Date().toISOString().split('T')[0],
+        customerName: item['اسم المستلم'] || '',
+        phone: String(item['الهاتف 1'] || ''),
+        province: item['المدينة'] || '',
+        amount: Number(item['المطلوب تحصيله']) || 0,
+        status: ShipmentStatus.DAILY_OUT,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        city: item['المنطقة'] || '',
+        address: item['العنوان'] || '',
+        pieces: Number(item['عدد القطع']) || 1,
+        products: item['المنتجات'] || '',
+        shippingFee: Number(item['سعر الشحن']) || 0,
+        carrierName: item['شركة الشحن'] || '',
+        confirmedBy: item['موظف التأكيد'] || '',
+        amountWithoutShipping: Number(item['السعر الكلي بدون الشحن']) || 0,
+        totalWithShipping: Number(item['السعر الكلي بالشحن']) || 0,
+      }));
+      setOrders(prev => [...newOrders, ...prev]);
+    } else {
+      setOrders(prev => prev.map(order => {
+        const updateItem = data.find(d => String(d['رقم الاوردر'] || d['orderNumber']).trim() === order.orderNumber);
+        if (updateItem) {
+          const mapping: any = {};
+          if (status === ShipmentStatus.DELIVERED) mapping.deliveryDate = updateItem['تاريخ التسليم'];
+          if (status === ShipmentStatus.FAILED) mapping.failedDate = updateItem['تاريخ فشل التسليم'];
+          if (status === ShipmentStatus.RETURNED) mapping.returnedDate = updateItem['تاريخ المرتجع'];
+          if (status === ShipmentStatus.COLLECTED) {
+            mapping.collectionDate = updateItem['تاريخ التحصيل'];
+            mapping.carrierShippingFee = Number(updateItem['م.الشحن']) || 0;
+            mapping.netAmount = Number(updateItem['الصافي']) || 0;
+            mapping.returnFee = Number(updateItem['م.المرتجع']) || 0;
+            
+            // حساب الفرق تلقائياً بناءً على الأسعار المخزنة
+            const rate = shippingRates.find(r => r.province === order.province && r.carrier === order.carrierName);
+            if (rate) {
+                mapping.systemShippingFee = rate.deliveryPrice;
+                if (mapping.carrierShippingFee !== undefined) {
+                    mapping.discrepancy = mapping.carrierShippingFee - mapping.systemShippingFee;
+                }
+            }
+          }
+          return { ...order, status, updatedAt: new Date().toISOString(), ...mapping };
+        }
+        return order;
+      }));
+    }
+  };
+
+  const getStats = useCallback((): DashboardStats => {
+    const stats = { dailyOut: 0, delivered: 0, failed: 0, returned: 0, collected: 0, delayedUpdate: 0, delayedCollection: 0, delayedReturn: 0 };
+    const now = new Date();
+
+    orders.forEach(o => {
+      if (o.status === ShipmentStatus.DAILY_OUT) stats.dailyOut++;
+      else if (o.status === ShipmentStatus.DELIVERED) stats.delivered++;
+      else if (o.status === ShipmentStatus.FAILED) stats.failed++;
+      else if (o.status === ShipmentStatus.RETURNED) stats.returned++;
+      else if (o.status === ShipmentStatus.COLLECTED) stats.collected++;
+
+      const exitDate = new Date(o.exitDate || o.createdAt);
+      const updateDate = new Date(o.updatedAt);
+      const diffFromExit = (now.getTime() - exitDate.getTime()) / (1000 * 3600 * 24);
+      const diffFromUpdate = (now.getTime() - updateDate.getTime()) / (1000 * 3600 * 24);
+
+      if (o.status === ShipmentStatus.DAILY_OUT && diffFromExit > 4) stats.delayedUpdate++;
+      if (o.status === ShipmentStatus.DELIVERED && diffFromUpdate > 7) stats.delayedCollection++;
+      if (o.status === ShipmentStatus.FAILED && diffFromUpdate > 7) stats.delayedReturn++;
+    });
+    return stats;
+  }, [orders]);
+
+  return (
+    <AppContext.Provider value={{ orders, shippingRates, addOrder, updateOrderStatus, bulkUpload, addRate, deleteRate, getStats }}>
+      {children}
+    </AppContext.Provider>
+  );
+};
+
+export const useApp = () => {
+  const context = useContext(AppContext);
+  if (!context) throw new Error("useApp must be used within AppProvider");
+  return context;
+};
