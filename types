@@ -1,0 +1,62 @@
+
+export enum ShipmentStatus {
+  DAILY_OUT = "خروج يومي",
+  DELIVERED = "تم التسليم",
+  FAILED = "فشل التسليم",
+  RETURNED = "مرتجع",
+  COLLECTED = "تم التحصيل"
+}
+
+export interface Order {
+  id: string;
+  orderNumber: string;        // رقم الاوردر
+  exitDate: string;           // تاريخ الخروج
+  customerName: string;       // اسم المستلم
+  phone: string;              // الهاتف 1
+  phone2?: string;            // الهاتف 2
+  province: string;           // المدينة (المحافظة)
+  city: string;               // المنطقة
+  address: string;            // العنوان
+  pieces: number;             // عدد القطع
+  products: string;           // المنتجات
+  amountWithoutShipping: number; // السعر الكلي بدون الشحن
+  shippingFee: number;        // سعر الشحن
+  totalWithShipping: number;  // السعر الكلي بالشحن
+  amount: number;             // المطلوب تحصيله
+  carrierName: string;        // شركة الشحن
+  confirmedBy: string;        // موظف التأكيد
+  status: ShipmentStatus;     // الحالة
+  
+  createdAt: string;
+  updatedAt: string;
+
+  // Additional Fields from other templates
+  deliveryDate?: string;      // تاريخ التسليم
+  failedDate?: string;        // تاريخ فشل التسليم
+  returnedDate?: string;      // تاريخ المرتجع
+  collectionDate?: string;    // تاريخ التحصيل
+  carrierShippingFee?: number;// م.الشحن (الذي خصمته الشركة)
+  systemShippingFee?: number; // السعر المخزن في النظام
+  netAmount?: number;         // الصافي
+  returnFee?: number;         // م.المرتجع
+  discrepancy?: number;       // الفرق
+}
+
+export interface ShippingRate {
+  id: string;
+  province: string;
+  carrier: string;
+  deliveryPrice: number;
+  returnPrice: number;
+}
+
+export interface DashboardStats {
+  dailyOut: number;
+  delivered: number;
+  failed: number;
+  returned: number;
+  collected: number;
+  delayedUpdate: number;
+  delayedCollection: number;
+  delayedReturn: number;
+}
