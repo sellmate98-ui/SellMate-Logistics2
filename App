@@ -1,0 +1,116 @@
+
+import React, { useState, useContext } from 'react';
+import Sidebar from './components/Sidebar';
+import Dashboard from './components/Dashboard';
+import OrderTable from './components/OrderTable';
+import UploadManager from './components/UploadManager';
+import ComparisonTool from './components/ComparisonTool';
+import ShippingRates from './components/ShippingRates';
+import { AppProvider, useApp } from './store';
+import { ShipmentStatus } from './types';
+
+const AppContent: React.FC = () => {
+  const [currentSection, setCurrentSection] = useState('dashboard');
+  const { orders, updateOrderStatus } = useApp();
+
+  const renderContent = () => {
+    switch (currentSection) {
+      case 'dashboard':
+        return <Dashboard />;
+      case 'daily-out':
+        return (
+          <div className="p-8">
+            <OrderTable orders={orders} title="سجل الخروج اليومي" statusFilter={ShipmentStatus.DAILY_OUT} onUpdateStatus={updateOrderStatus} />
+          </div>
+        );
+      case 'delivered':
+        return (
+          <div className="p-8">
+            <OrderTable orders={orders} title="التسليمات" statusFilter={ShipmentStatus.DELIVERED} onUpdateStatus={updateOrderStatus} />
+          </div>
+        );
+      case 'failed':
+        return (
+          <div className="p-8">
+            <OrderTable orders={orders} title="فشل التسليم" statusFilter={ShipmentStatus.FAILED} onUpdateStatus={updateOrderStatus} />
+          </div>
+        );
+      case 'returned':
+        return (
+          <div className="p-8">
+            <OrderTable orders={orders} title="المرتجعات" statusFilter={ShipmentStatus.RETURNED} onUpdateStatus={updateOrderStatus} />
+          </div>
+        );
+      case 'collected':
+        return (
+          <div className="p-8">
+            <OrderTable orders={orders} title="صفحة التحصيلات المالية" statusFilter={ShipmentStatus.COLLECTED} onUpdateStatus={updateOrderStatus} />
+          </div>
+        );
+      case 'upload':
+        return <UploadManager />;
+      case 'comparison':
+        return <ComparisonTool />;
+      case 'shipping-rates':
+        return <ShippingRates />;
+      case 'search':
+        return (
+          <div className="p-8">
+            <OrderTable orders={orders} title="بحث سريع في جميع الشحنات" />
+          </div>
+        );
+      case 'duplicates':
+        // العثور على التكرارات بناءً على رقم الهاتف
+        const duplicates = orders.filter((o, i) => 
+          orders.findIndex(x => x.phone === o.phone && x.id !== o.id) !== -1
+        );
+        return (
+          <div className="p-8">
+            <OrderTable orders={duplicates} title="الشحنات المكررة (نفس رقم الهاتف)" />
+          </div>
+        );
+      default:
+        return <Dashboard />;
+    }
+  };
+
+  return (
+    <div className="flex bg-slate-50 min-h-screen">
+      <Sidebar currentSection={currentSection} onNavigate={setCurrentSection} />
+      <main className="flex-1 mr-64 transition-all duration-300">
+        <header className="bg-white/80 backdrop-blur-xl sticky top-0 z-40 px-8 py-4 border-b border-slate-100 flex justify-between items-center shadow-sm">
+          <div className="flex items-center space-x-3 space-x-reverse">
+            <div className="w-10 h-10 bg-blue-600 rounded-2xl flex items-center justify-center text-white font-bold shadow-lg shadow-blue-200">SM</div>
+            <span className="text-xl font-black text-slate-800 tracking-tight">SellMate <span className="text-blue-600">Logistics</span></span>
+          </div>
+          <div className="flex items-center space-x-4 space-x-reverse">
+             <button onClick={() => setCurrentSection('upload')} className="bg-blue-600 text-white px-5 py-2.5 rounded-2xl text-xs font-bold shadow-lg shadow-blue-200 hover:bg-blue-700 transition-all flex items-center gap-2">
+               <span className="material-icons text-sm">cloud_upload</span> تحديث الشحنات
+             </button>
+             <div className="h-10 w-[1px] bg-slate-200 mx-2"></div>
+             <div className="flex items-center gap-3">
+               <div className="text-left leading-none">
+                 <p className="text-xs font-bold text-slate-700">الإدارة</p>
+                 <p className="text-[10px] text-slate-400 uppercase tracking-widest">Admin Panel</p>
+               </div>
+               <div className="w-10 h-10 rounded-2xl bg-slate-100 border-2 border-white shadow-sm flex items-center justify-center overflow-hidden">
+                  <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Felix" alt="User" />
+               </div>
+             </div>
+          </div>
+        </header>
+        <div className="max-w-[1600px] mx-auto">
+          {renderContent()}
+        </div>
+      </main>
+    </div>
+  );
+};
+
+const App: React.FC = () => (
+  <AppProvider>
+    <AppContent />
+  </AppProvider>
+);
+
+export default App;
